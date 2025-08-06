@@ -108,10 +108,23 @@ function Sidebar({ collapsed }) {
         })}
       </ul>
       {!collapsed && (
-        <div className="text-xs text-gray-500 text-center px-2 py-3">
-          <hr className="my-2" />
-          VAANFLY © 2025 Inventory
-        </div>
+        <>
+          <button
+            onClick={() => {
+              localStorage.removeItem("authToken");
+              localStorage.removeItem("authUser");
+              navigate("/login");
+            }}
+            className="flex items-center px-4 py-2 mx-2 mb-3 text-gray transition hover:text-maincolor"
+          >
+            <i className="bx bx-log-out text-xl me-2"></i>
+            Logout
+          </button>
+          <div className="text-xs text-gray-500 text-center px-2 py-3">
+            <hr className="my-2" />
+            VAANFLY © 2025 Inventory
+          </div>
+        </>
       )}
     </div>
   )

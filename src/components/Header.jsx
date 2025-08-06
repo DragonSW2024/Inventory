@@ -1,6 +1,7 @@
 import React from 'react'
 
 function Header({ collapsed, toggleSidebar }) {
+  const user = JSON.parse(localStorage.getItem("authUser"));
   const getRandomColor = () => {
     const letters = "0123456789ABCDEF";
     return Array.from({ length: 6 }, () =>
@@ -32,7 +33,7 @@ function Header({ collapsed, toggleSidebar }) {
           </p>
         </div> */}
         <img
-          src={generateAvatarUrl("Demo")}
+          src={generateAvatarUrl(user?.username)}
           alt="UserImage"
           className="w-[40px] h-[40px] rounded-full"
         />
