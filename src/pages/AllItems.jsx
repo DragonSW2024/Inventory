@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { QRCodeCanvas } from 'qrcode.react';
 import axios from 'axios';
 
 function AllItems() {
@@ -6,10 +7,13 @@ function AllItems() {
     const [view, setView] = useState('list');
     const [showModal, setShowModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
+    const [showQR, setShowQR] = useState(false);
+    const [position, setPosition] = useState({ x: 0, y: 0 });
     const currentUser = JSON.parse(localStorage.getItem("authUser"));
     const [newItem, setNewItem] = useState({
         name: '',
         model: '',
+        count: '',
         category: '',
         price: '',
         condition: 'Good',
@@ -47,6 +51,7 @@ function AllItems() {
             setNewItem({
                 name: '',
                 model: '',
+                count: '',
                 category: '',
                 price: '',
                 condition: 'Good',
@@ -60,12 +65,37 @@ function AllItems() {
     };
 
     const handleUpdateItem = async () => {
+        if (!selectedItem || !selectedItem._id) {
+            console.error("Invalid selected item for update:", selectedItem);
+            return;
+        }
+
         try {
-            const res = await axios.put(`http://192.168.10.102:8866/products/${selectedItem._id}`, selectedItem);
-            setItems(items.map(item => item._id === res.data._id ? res.data : item));
-            setSelectedItem({ ...res.data, editing: false });
+            const res = await axios.put(
+                `http://192.168.10.102:8866/products/${selectedItem._id}`,
+                selectedItem
+            );
+
+            const updated = res.data;
+
+            if (!updated || !updated._id) {
+                console.error("Invalid response from server:", updated);
+                return;
+            }
+
+            // Update item in the list
+            setItems((prevItems) =>
+                prevItems.map((item) =>
+                    item._id === updated._id ? updated : item
+                )
+            );
+
+            // Update selected item to reflect new state
+            setSelectedItem({ ...updated, editing: false });
+            setSelectedItem(null);
+
         } catch (err) {
-            console.error('Failed to update item:', err);
+            console.error("Failed to update item:", err);
         }
     };
 
@@ -77,6 +107,16 @@ function AllItems() {
         } catch (err) {
             console.error('Failed to delete item:', err);
         }
+    };
+
+    const handleMouseEnter = (e) => {
+        const rect = e.target.getBoundingClientRect();
+        setPosition({ x: rect.right, y: rect.top });
+        setShowQR(true);
+    };
+
+    const handleMouseLeave = () => {
+        setShowQR(false);
     };
 
     return (
@@ -110,9 +150,10 @@ function AllItems() {
                             <thead>
                                 <tr className="border-b bg-gray-50 text-left text-gray-600">
                                     <th className="p-3">#</th>
-                                    <th className="p-3">ID</th>
-                                    <th className="p-3">Name</th>
+                                    <th className="p-3">Product ID</th>
+                                    <th className="p-3">Product Name</th>
                                     <th className="p-3">Model</th>
+                                    <th className="p-3">Count</th>
                                     <th className="p-3">Category</th>
                                     <th className="p-3">Price</th>
                                     <th className="p-3">Condition</th>
@@ -121,19 +162,35 @@ function AllItems() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {currentItems.map((item, idx) => (
-                                    <tr key={idx} className="border-b hover:bg-gray-50" onClick={() => setSelectedItem({ ...item, editing: false })}>
-                                        <td className="p-3">{idx + 1 + ((currentPage - 1) * itemsPerPage)}</td>
-                                        <td className="p-3">{item.id}</td>
-                                        <td className="p-3 text-blue-600 hover:underline cursor-pointer">{item.name}</td>
-                                        <td className="p-3">{item.model}</td>
-                                        <td className="p-3">{item.category}</td>
-                                        <td className="p-3 font-medium">Rs: {item.price}</td>
-                                        <td className="p-3">{item.condition}</td>
-                                        <td className="p-3">{item.createdBy}</td>
-                                        <td className="p-3">{item.createdAt}</td>
-                                    </tr>
-                                ))}
+                                {currentItems.map((item, idx) => {
+                                    if (!item || typeof item !== 'object') return null;
+                                    return (
+                                        <>
+                                            <tr key={item._id || idx} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedItem({ ...item, editing: false })}>
+                                                <td className="p-3">{idx + 1 + ((currentPage - 1) * itemsPerPage)}</td>
+                                                <td className="p-3">{item.id}</td>
+                                                <td className="p-3 text-blue-600 hover:underline cursor-pointer" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>{item.name}</td>
+                                                <td className="p-3">{item.model}</td>
+                                                <td className="p-3">{item.count}</td>
+                                                <td className="p-3">{item.category}</td>
+                                                <td className="p-3 font-medium">Rs: {item.price}</td>
+                                                <td className="p-3">{item.condition}</td>
+                                                <td className="p-3">{item.createdBy}</td>
+                                                <td className="p-3">{new Date(item.createdAt).toLocaleString('sv-SE', { hour12: false })}</td>
+                                            </tr>
+                                            {showQR && (
+                                                    <div
+                                                        className="absolute bg-white border rounded shadow-lg p-4 z-50"
+                                                        style={{ top: position.y, left: position.x }}
+                                                    >
+                                                        <div className="text-center mb-2 font-semibold">{item.name}</div>
+                                                        <QRCodeCanvas value={JSON.stringify(item)} size={128} />
+                                                    </div>
+                                                )
+                                            }
+                                        </>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -175,6 +232,7 @@ function AllItems() {
                         <div className="space-y-3">
                             <input className="w-full border p-2 rounded" placeholder="Name" value={newItem.name} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} />
                             <input className="w-full border p-2 rounded" placeholder="Model" value={newItem.model} onChange={(e) => setNewItem({ ...newItem, model: e.target.value })} />
+                            <input className="w-full border p-2 rounded" placeholder="Count" value={newItem.count} onChange={(e) => setNewItem({ ...newItem, count: e.target.value })} />
                             <input className="w-full border p-2 rounded" placeholder="Category" value={newItem.category} onChange={(e) => setNewItem({ ...newItem, category: e.target.value })} />
                             <input className="w-full border p-2 rounded" placeholder="Price" value={newItem.price} onChange={(e) => setNewItem({ ...newItem, price: e.target.value })} />
                             <select className="w-full border p-2 rounded" value={newItem.condition} onChange={(e) => setNewItem({ ...newItem, condition: e.target.value })}>
@@ -195,18 +253,46 @@ function AllItems() {
             <div className={`fixed right-0 top-0 h-full w-96 bg-white shadow-lg z-50 border-l transform transition-transform duration-300 ${selectedItem ? 'translate-x-0' : 'translate-x-full'}`}>
                 <div className="p-4 flex justify-between items-center border-b">
                     <h2 className="text-lg font-semibold">Product Details</h2>
-                    <button onClick={() => setSelectedItem(null)} className="text-gray-500 hover:text-red-600 text-xl">×</button>
+
+                    <div className="flex items-center gap-2">
+                        {selectedItem?.editing ? (
+                            <>
+                                <button onClick={handleUpdateItem} title="Save">
+                                    <i className="bx bx-save text-blue-600 text-xl hover:scale-110 transition" />
+                                </button>
+                                <button onClick={() => setSelectedItem({ ...selectedItem, editing: false })} title="Cancel">
+                                    <i className="bx bx-x-circle text-gray-500 text-xl hover:scale-110 transition" />
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <button onClick={() => setSelectedItem({ ...selectedItem, editing: true })} title="Edit">
+                                    <i className="bx bx-edit text-blue-600 text-xl hover:scale-110 transition" />
+                                </button>
+                                <button onClick={() => handleDeleteItem(selectedItem._id)} title="Delete">
+                                    <i className="bx bx-trash text-gray-600 text-xl hover:scale-110 transition" />
+                                </button>
+                            </>
+                        )}
+
+                        {/* Close button */}
+                        <button onClick={() => setSelectedItem(null)} title="Close">
+                            <i className="bx bx-x text-gray-500 text-2xl hover:text-red-600 hover:scale-110 transition" />
+                        </button>
+                    </div>
                 </div>
                 {selectedItem && (
                     <>
                         <div className="p-4 space-y-3">
                             {selectedItem.editing ? (
+
                                 <>
-                                    <input className="w-full border p-2 rounded" value={selectedItem.name} onChange={(e) => setSelectedItem({ ...selectedItem, name: e.target.value })} />
-                                    <input className="w-full border p-2 rounded" value={selectedItem.model} onChange={(e) => setSelectedItem({ ...selectedItem, model: e.target.value })} />
-                                    <input className="w-full border p-2 rounded" value={selectedItem.category} onChange={(e) => setSelectedItem({ ...selectedItem, category: e.target.value })} />
-                                    <input className="w-full border p-2 rounded" value={selectedItem.price} onChange={(e) => setSelectedItem({ ...selectedItem, price: e.target.value })} />
-                                    <select className="w-full border p-2 rounded" value={selectedItem.condition} onChange={(e) => setSelectedItem({ ...selectedItem, condition: e.target.value })}>
+                                    <input className="w-full border p-2 rounded" value={selectedItem.name || ""} onChange={(e) => setSelectedItem({ ...selectedItem, name: e.target.value })} />
+                                    <input className="w-full border p-2 rounded" value={selectedItem.model || ""} onChange={(e) => setSelectedItem({ ...selectedItem, model: e.target.value })} />
+                                    <input className="w-full border p-2 rounded" value={selectedItem.count || ""} onChange={(e) => setSelectedItem({ ...selectedItem, count: e.target.value })} />
+                                    <input className="w-full border p-2 rounded" value={selectedItem.category || ""} onChange={(e) => setSelectedItem({ ...selectedItem, category: e.target.value })} />
+                                    <input className="w-full border p-2 rounded" value={selectedItem.price || ""} onChange={(e) => setSelectedItem({ ...selectedItem, price: e.target.value })} />
+                                    <select className="w-full border p-2 rounded" value={selectedItem.condition || ""} onChange={(e) => setSelectedItem({ ...selectedItem, condition: e.target.value })}>
                                         <option value="Good">Good</option>
                                         <option value="Medium">Medium</option>
                                         <option value="Bad">Bad</option>
@@ -214,15 +300,42 @@ function AllItems() {
                                 </>
                             ) : (
                                 <>
-                                    <p><strong>Name:</strong> {selectedItem.name}</p>
-                                    <p><strong>Model:</strong> {selectedItem.model}</p>
-                                    <p><strong>Category:</strong> {selectedItem.category}</p>
-                                    <p><strong>Price:</strong> {selectedItem.price}</p>
-                                    <p><strong>Condition:</strong> {selectedItem.condition}</p>
+                                    <div className="mt-4 text-center flex flex-col items-center w-full">
+                                        <QRCodeCanvas value={JSON.stringify(selectedItem)} size={150} />
+                                        <h3 className="font-semibold mb-2">{selectedItem.name}</h3>
+                                    </div>
+                                    <table className="w-full border border-gray-300">
+                                        <tbody>
+                                            <tr>
+                                                <td className="p-2 font-semibold border border-gray-300">Product Name</td>
+                                                <td className="p-2 border border-gray-300">{selectedItem.name}</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="p-2 font-semibold border border-gray-300">Model</td>
+                                                <td className="p-2 border border-gray-300">{selectedItem.model}</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="p-2 font-semibold border border-gray-300">Count</td>
+                                                <td className="p-2 border border-gray-300">{selectedItem.count}</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="p-2 font-semibold border border-gray-300">Category</td>
+                                                <td className="p-2 border border-gray-300">{selectedItem.category}</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="p-2 font-semibold border border-gray-300">Price</td>
+                                                <td className="p-2 border border-gray-300">{selectedItem.price}</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="p-2 font-semibold border border-gray-300">Condition</td>
+                                                <td className="p-2 border border-gray-300">{selectedItem.condition}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </>
                             )}
                         </div>
-                        <div className="p-4 border-t flex justify-between">
+                        {/* <div className="p-4 border-t flex justify-between">
                             {selectedItem.editing ? (
                                 <>
                                     <button onClick={handleUpdateItem} className="px-4 py-2 bg-green-600 text-white rounded">Save</button>
@@ -234,7 +347,7 @@ function AllItems() {
                                     <button onClick={() => handleDeleteItem(selectedItem._id)} className="px-4 py-2 bg-red-500 text-white rounded">Delete</button>
                                 </>
                             )}
-                        </div>
+                        </div> */}
                     </>
                 )}
             </div>
