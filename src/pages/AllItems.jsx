@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import axios from 'axios';
 
 function AllItems() {
     const [items, setItems] = useState([]);
     const [view, setView] = useState('list');
+    const sidebarRef = useRef(null);
+    const [searchTerm, setSearchTerm] = useState("");
     const [showModal, setShowModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [showQR, setShowQR] = useState(false);
@@ -16,6 +18,7 @@ function AllItems() {
         count: '',
         category: '',
         price: '',
+        url: '',
         condition: 'Good',
         createdBy: currentUser?.username || 'Unknown',
         modifiedBy: currentUser?.username || 'Unknown',
@@ -32,12 +35,25 @@ function AllItems() {
         }
     };
 
+    const filteredItems = items.filter(item =>
+        item.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.condition?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
     useEffect(() => {
         fetchItems();
     }, []);
 
-    const totalPages = Math.ceil(items.length / itemsPerPage);
-    const currentItems = items.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+    const currentItems = filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+    const handleSearchChange = (e) => {
+        setSearchTerm(e.target.value);
+        setCurrentPage(1);
+    };
 
     const changePage = (page) => {
         if (page >= 1 && page <= totalPages) setCurrentPage(page);
@@ -54,6 +70,7 @@ function AllItems() {
                 count: '',
                 category: '',
                 price: '',
+                url: '',
                 condition: 'Good',
                 createdBy: currentUser?.username || 'Unknown',
                 modifiedBy: currentUser?.username || 'Unknown',
@@ -119,15 +136,34 @@ function AllItems() {
         setShowQR(false);
     };
 
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (sidebarRef.current && !sidebarRef.current.contains(event.target)) {
+                setSelectedItem(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
     return (
         <div className="p-6 bg-white">
             {/* Header */}
             <div className="flex justify-between items-center mb-4">
                 <h1 className="text-xl font-semibold">All Items</h1>
                 <div className="flex items-center gap-2">
+                    <input
+                        type="text"
+                        placeholder="Search by name, model, category..."
+                        value={searchTerm}
+                        onChange={handleSearchChange}
+                        className="border px-3 py-2 rounded text-sm"
+                    />
                     <button
                         onClick={() => setShowModal(true)}
-                        className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        className="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
                     >
                         + New
                     </button>
@@ -148,7 +184,7 @@ function AllItems() {
                     <div className="overflow-x-auto">
                         <table className="min-w-full text-sm">
                             <thead>
-                                <tr className="border-b bg-gray-50 text-left text-gray-600">
+                                <tr className="border-b bg-gray-50 text-left text-gray-600 pointer-events-none">
                                     <th className="p-3">#</th>
                                     <th className="p-3">Product ID</th>
                                     <th className="p-3">Product Name</th>
@@ -162,23 +198,30 @@ function AllItems() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {currentItems.map((item, idx) => {
-                                    if (!item || typeof item !== 'object') return null;
-                                    return (
-                                        <>
-                                            <tr key={item._id || idx} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedItem({ ...item, editing: false })}>
-                                                <td className="p-3">{idx + 1 + ((currentPage - 1) * itemsPerPage)}</td>
-                                                <td className="p-3">{item.id}</td>
-                                                <td className="p-3 text-blue-600 hover:underline cursor-pointer" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>{item.name}</td>
-                                                <td className="p-3">{item.model}</td>
-                                                <td className="p-3">{item.count}</td>
-                                                <td className="p-3">{item.category}</td>
-                                                <td className="p-3 font-medium">Rs: {item.price}</td>
-                                                <td className="p-3">{item.condition}</td>
-                                                <td className="p-3">{item.createdBy}</td>
-                                                <td className="p-3">{new Date(item.createdAt).toLocaleString('sv-SE', { hour12: false })}</td>
-                                            </tr>
-                                            {showQR && (
+                                {currentItems.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="10" className="p-4 text-center text-gray-500">
+                                            No results found
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    currentItems.map((item, idx) => {
+                                        if (!item || typeof item !== 'object') return null;
+                                        return (
+                                            <>
+                                                <tr key={item._id || idx} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedItem({ ...item, editing: false })}>
+                                                    <td className="p-3">{idx + 1 + ((currentPage - 1) * itemsPerPage)}</td>
+                                                    <td className="p-3">{item.id}</td>
+                                                    <td className="p-3 text-blue-600 hover:underline cursor-pointer" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>{item.name}</td>
+                                                    <td className="p-3">{item.model}</td>
+                                                    <td className="p-3">{item.count}</td>
+                                                    <td className="p-3">{item.category}</td>
+                                                    <td className="p-3 font-medium">Rs: {item.price}</td>
+                                                    <td className="p-3">{item.condition}</td>
+                                                    <td className="p-3">{item.createdBy}</td>
+                                                    <td className="p-3">{new Date(item.createdAt).toLocaleString('sv-SE', { hour12: false })}</td>
+                                                </tr>
+                                                {showQR && (
                                                     <div
                                                         className="absolute bg-white border rounded shadow-lg p-4 z-50"
                                                         style={{ top: position.y, left: position.x }}
@@ -187,10 +230,11 @@ function AllItems() {
                                                         <QRCodeCanvas value={JSON.stringify(item)} size={128} />
                                                     </div>
                                                 )
-                                            }
-                                        </>
-                                    );
-                                })}
+                                                }
+                                            </>
+                                        );
+                                    })
+                                )}
                             </tbody>
                         </table>
                     </div>
@@ -212,15 +256,21 @@ function AllItems() {
             {/* Grid View */}
             {view === 'grid' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {items.map((item, idx) => (
-                        <div key={idx} className="border p-4 rounded shadow hover:shadow-md transition">
-                            <h2 className="text-blue-600 font-semibold">{item.name}</h2>
-                            <p className="text-sm"><strong>Model:</strong> {item.model}</p>
-                            <p className="text-sm"><strong>Category:</strong> {item.category}</p>
-                            <p className="text-sm"><strong>Price:</strong> {item.price}</p>
-                            <p className="text-sm"><strong>Condition:</strong> {item.condition}</p>
+                    {filteredItems.length === 0 ? (
+                        <div className="col-span-full text-center text-gray-500">
+                            No results found
                         </div>
-                    ))}
+                    ) : (
+                        filteredItems.map((item, idx) => (
+                            <div key={idx} className="border p-4 rounded shadow hover:shadow-md transition">
+                                <h2 className="text-blue-600 font-semibold">{item.name}</h2>
+                                <p className="text-sm"><strong>Model:</strong> {item.model}</p>
+                                <p className="text-sm"><strong>Category:</strong> {item.category}</p>
+                                <p className="text-sm"><strong>Price:</strong> {item.price}</p>
+                                <p className="text-sm"><strong>Condition:</strong> {item.condition}</p>
+                            </div>
+                        ))
+                    )}
                 </div>
             )}
 
@@ -235,6 +285,7 @@ function AllItems() {
                             <input className="w-full border p-2 rounded" placeholder="Count" value={newItem.count} onChange={(e) => setNewItem({ ...newItem, count: e.target.value })} />
                             <input className="w-full border p-2 rounded" placeholder="Category" value={newItem.category} onChange={(e) => setNewItem({ ...newItem, category: e.target.value })} />
                             <input className="w-full border p-2 rounded" placeholder="Price" value={newItem.price} onChange={(e) => setNewItem({ ...newItem, price: e.target.value })} />
+                            <input className="w-full border p-2 rounded" placeholder="Product URL" value={newItem.url} onChange={(e) => setNewItem({ ...newItem, url: e.target.value })} />
                             <select className="w-full border p-2 rounded" value={newItem.condition} onChange={(e) => setNewItem({ ...newItem, condition: e.target.value })}>
                                 <option value="Good">Good</option>
                                 <option value="Medium">Medium</option>
@@ -250,7 +301,7 @@ function AllItems() {
             )}
 
             {/* Side Panel */}
-            <div className={`fixed right-0 top-0 h-full w-96 bg-white shadow-lg z-50 border-l transform transition-transform duration-300 ${selectedItem ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div ref={sidebarRef} className={`fixed right-0 top-0 h-full w-96 bg-white shadow-lg z-50 border-l transform transition-transform duration-300 ${selectedItem ? 'translate-x-0' : 'translate-x-full'}`}>
                 <div className="p-4 flex justify-between items-center border-b">
                     <h2 className="text-lg font-semibold">Product Details</h2>
 
@@ -292,6 +343,7 @@ function AllItems() {
                                     <input className="w-full border p-2 rounded" value={selectedItem.count || ""} onChange={(e) => setSelectedItem({ ...selectedItem, count: e.target.value })} />
                                     <input className="w-full border p-2 rounded" value={selectedItem.category || ""} onChange={(e) => setSelectedItem({ ...selectedItem, category: e.target.value })} />
                                     <input className="w-full border p-2 rounded" value={selectedItem.price || ""} onChange={(e) => setSelectedItem({ ...selectedItem, price: e.target.value })} />
+                                    <input className="w-full border p-2 rounded" value={selectedItem.url || ""} onChange={(e) => setSelectedItem({ ...selectedItem, url: e.target.value })} />
                                     <select className="w-full border p-2 rounded" value={selectedItem.condition || ""} onChange={(e) => setSelectedItem({ ...selectedItem, condition: e.target.value })}>
                                         <option value="Good">Good</option>
                                         <option value="Medium">Medium</option>
@@ -307,31 +359,38 @@ function AllItems() {
                                     <table className="w-full border border-gray-300">
                                         <tbody>
                                             <tr>
-                                                <td className="p-2 font-semibold border border-gray-300">Product Name</td>
-                                                <td className="p-2 border border-gray-300">{selectedItem.name}</td>
+                                                <td className="p-2 font-semibold border border-gray-300 text-xs">Product Name</td>
+                                                <td className="p-2 border border-gray-300 text-xs">{selectedItem.name}</td>
                                             </tr>
                                             <tr>
-                                                <td className="p-2 font-semibold border border-gray-300">Model</td>
-                                                <td className="p-2 border border-gray-300">{selectedItem.model}</td>
+                                                <td className="p-2 font-semibold border border-gray-300 text-xs">Model</td>
+                                                <td className="p-2 border border-gray-300 text-xs">{selectedItem.model}</td>
                                             </tr>
                                             <tr>
-                                                <td className="p-2 font-semibold border border-gray-300">Count</td>
-                                                <td className="p-2 border border-gray-300">{selectedItem.count}</td>
+                                                <td className="p-2 font-semibold border border-gray-300 text-xs">Count</td>
+                                                <td className="p-2 border border-gray-300 text-xs">{selectedItem.count}</td>
                                             </tr>
                                             <tr>
-                                                <td className="p-2 font-semibold border border-gray-300">Category</td>
-                                                <td className="p-2 border border-gray-300">{selectedItem.category}</td>
+                                                <td className="p-2 font-semibold border border-gray-300 text-xs">Category</td>
+                                                <td className="p-2 border border-gray-300 text-xs">{selectedItem.category}</td>
                                             </tr>
                                             <tr>
-                                                <td className="p-2 font-semibold border border-gray-300">Price</td>
-                                                <td className="p-2 border border-gray-300">{selectedItem.price}</td>
+                                                <td className="p-2 font-semibold border border-gray-300 text-xs">Price</td>
+                                                <td className="p-2 border border-gray-300 text-xs">{selectedItem.price}</td>
                                             </tr>
                                             <tr>
-                                                <td className="p-2 font-semibold border border-gray-300">Condition</td>
-                                                <td className="p-2 border border-gray-300">{selectedItem.condition}</td>
+                                                <td className="p-2 font-semibold border border-gray-300 text-xs">Condition</td>
+                                                <td className="p-2 border border-gray-300 text-xs">{selectedItem.condition}</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="p-2 font-semibold border border-gray-300 text-xs">Product URL</td>
+                                                <td className="p-2 border border-gray-300 text-xs"><a href={selectedItem.url} className='text-blue-500'>{selectedItem.url.length > 20 ? selectedItem.url.slice(0, 20) + '...' : selectedItem.url}</a></td>
                                             </tr>
                                         </tbody>
                                     </table>
+                                    {/* <div className='text-xs'>
+                                        Product URL: <a href={selectedItem.url}>{selectedItem.url}</a>
+                                    </div> */}
                                 </>
                             )}
                         </div>

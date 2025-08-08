@@ -1,70 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
-
-const vendors = [
-    {
-        vendor_id: 'V001',
-        vendor_name: 'Precision Machina',
-        category: 'Machining',
-        address: '123 Industrial Area, Coimbatore, Tamil Nadu, India',
-        contact_number: '+91-9876543210',
-        rating: 4.5,
-        lead_time_tracking: [
-            {
-                order_id: 'ORD1001',
-                order_date: '2025-07-20',
-                expected_delivery: '2025-07-30',
-                actual_delivery: '2025-07-29',
-                status: 'On Time'
-            },
-            {
-                order_id: 'ORD1012',
-                order_date: '2025-06-15',
-                expected_delivery: '2025-06-25',
-                actual_delivery: '2025-06-28',
-                status: 'Delayed'
-            }
-        ]
-    },
-    {
-        vendor_id: 'V002',
-        vendor_name: 'ElectroHub Supplies',
-        category: 'Electronics',
-        address: '45 Tech Park, Bengaluru, Karnataka, India',
-        contact_number: '+91-9012345678',
-        rating: 4.2,
-        lead_time_tracking: [
-            {
-                order_id: 'ORD1033',
-                order_date: '2025-07-10',
-                expected_delivery: '2025-07-17',
-                actual_delivery: '2025-07-17',
-                status: 'On Time'
-            }
-        ]
-    },
-    {
-        vendor_id: 'V003',
-        vendor_name: 'FabConsumables Pvt Ltd',
-        category: 'Consumables',
-        address: 'Plot 88, MIDC Area, Pune, Maharashtra, India',
-        contact_number: '+91-9098765432',
-        rating: 4.7,
-        lead_time_tracking: [
-            {
-                order_id: 'ORD1055',
-                order_date: '2025-08-01',
-                expected_delivery: '2025-08-05',
-                actual_delivery: '2025-08-04',
-                status: 'On Time'
-            }
-        ]
-    }
-];
+import axios from 'axios';
 
 function VendorList() {
-    const [items, setItems] = useState(vendors);
+    const [items, setItems] = useState([]);
     const [view, setView] = useState('list');
+    const [searchQuery, setSearchQuery] = useState("");
     const [showModal, setShowModal] = useState(false);
     const [selectedVendor, setSelectedVendor] = useState(null);
     const [showQR, setShowQR] = useState(false);
@@ -74,6 +15,7 @@ function VendorList() {
         vendor_id: '',
         vendor_name: '',
         category: '',
+        subcategory: '',
         address: '',
         contact_number: '',
         rating: '',
@@ -83,13 +25,26 @@ function VendorList() {
     const itemsPerPage = 10;
     const [showFilters, setShowFilters] = useState(false);
     const filterRef = useRef(null);
+    const sidebarRef = useRef(null);
     const [filterCategory, setFilterCategory] = useState("All");
     const [minRating, setMinRating] = useState(0);
+    const API_BASE = "http://192.168.10.102:8866/api/vendors";
+
+    const handleSearch = (e) => {
+        if (e.key === "Enter") {
+            setCurrentPage(1); // Reset to first page
+        }
+    };
 
     const filteredItems = items.filter(item => {
         const matchesCategory = filterCategory === "All" || item.category === filterCategory;
         const matchesRating = item.rating >= minRating;
-        return matchesCategory && matchesRating;
+        const matchesSearch =
+            searchQuery.trim() === "" ||
+            Object.values(item).some(value =>
+                String(value).toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        return matchesCategory && matchesRating && matchesSearch;
     });
 
     const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
@@ -100,32 +55,60 @@ function VendorList() {
         if (page >= 1 && page <= totalPages) setCurrentPage(page);
     };
 
-    const handleAddVendor = () => {
+    useEffect(() => {
+        fetchVendors();
+    }, []);
+
+    const fetchVendors = async () => {
+        try {
+            const res = await axios.get(API_BASE);
+            setItems(res.data);
+        } catch (err) {
+            console.error("Error fetching vendors:", err);
+        }
+    };
+
+    const handleAddVendor = async () => {
         if (!newVendor.vendor_name) return;
-        setItems([...items, newVendor]);
-        setNewVendor({
-            vendor_id: '',
-            vendor_name: '',
-            category: '',
-            address: '',
-            contact_number: '',
-            rating: '',
-            lead_time_tracking: []
-        });
-        setShowModal(false);
+        try {
+            await axios.post(API_BASE, newVendor);
+            await fetchVendors();
+            setNewVendor({
+                vendor_id: '',
+                vendor_name: '',
+                category: '',
+                subcategory: '',
+                address: '',
+                contact_number: '',
+                rating: '',
+                lead_time_tracking: []
+            });
+            setShowModal(false);
+        } catch (err) {
+            console.error("Error adding vendor:", err);
+        }
     };
 
-    const handleUpdateVendor = () => {
+    const handleUpdateVendor = async () => {
         if (!selectedVendor) return;
-        setItems(items.map(item =>
-            item.vendor_id === selectedVendor.vendor_id ? selectedVendor : item
-        ));
-        setSelectedVendor({ ...selectedVendor, editing: false });
+        try {
+            await axios.put(`${API_BASE}/${selectedVendor._id}`, selectedVendor);
+            await fetchVendors();
+            setSelectedVendor({ ...selectedVendor, editing: false });
+        } catch (err) {
+            console.error("Error updating vendor:", err);
+        }
     };
 
-    const handleDeleteVendor = (vendorId) => {
-        setItems(items.filter(item => item.vendor_id !== vendorId));
-        setSelectedVendor(null);
+    const handleDeleteVendor = async (vendor) => {
+        if (!window.confirm(`Are you sure you want to delete ${vendor.vendor_name}?`)) return;
+        try {
+            await axios.delete(`${API_BASE}/${vendor._id}`);
+            await fetchVendors();
+            setSelectedVendor(null);
+        } catch (err) {
+            console.error("Error deleting vendor:", err);
+        }
     };
 
     const handleMouseEnter = (e, vendor) => {
@@ -144,6 +127,9 @@ function VendorList() {
             if (filterRef.current && !filterRef.current.contains(event.target)) {
                 setShowFilters(false);
             }
+            if (sidebarRef.current && !sidebarRef.current.contains(event.target)) {
+                setSelectedVendor(null);
+            }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => {
@@ -157,9 +143,18 @@ function VendorList() {
             <div className="flex justify-between items-center mb-4">
                 <h1 className="text-xl font-semibold">Vendor List</h1>
                 <div className="flex items-center gap-2">
+                    <input
+                        type="text"
+                        placeholder="Search vendors..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={handleSearch}
+                        className="border px-3 py-2 rounded w-64 text-sm"
+                        title="Press Enter to search"
+                    />
                     <button
                         onClick={() => setShowModal(true)}
-                        className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        className="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
                     >
                         + Add Vendor
                     </button>
@@ -232,6 +227,7 @@ function VendorList() {
                                     <th className="p-3">VENDOR ID</th>
                                     <th className="p-3">VENDOR NAME</th>
                                     <th className="p-3">CATEGORY</th>
+                                    <th className="p-3">SUB CATEGORY</th>
                                     <th className="p-3">ADDRESS</th>
                                     <th className="p-3">CONTACT</th>
                                     <th className="p-3">RATING</th>
@@ -254,6 +250,7 @@ function VendorList() {
                                             {item.vendor_name}
                                         </td>
                                         <td className="p-3">{item.category}</td>
+                                        <td className="p-3">{item.subcategory}</td>
                                         <td className="p-3">{item.address}</td>
                                         <td className="p-3">{item.contact_number}</td>
                                         <td className="p-3">{item.rating}</td>
@@ -322,6 +319,7 @@ function VendorList() {
                         >
                             <h2 className="text-blue-600 font-semibold">{item.vendor_name}</h2>
                             <p className="text-sm text-gray-500 mb-1">{item.category}</p>
+                            <p className="text-sm text-gray-500 mb-1">{item.subcategory}</p>
                             <p className="text-sm mb-1"><strong>ID:</strong> {item.vendor_id}</p>
                             <p className="text-sm mb-1"><strong>Contact:</strong> {item.contact_number}</p>
                             <p className="text-sm mb-1"><strong>Rating:</strong> {item.rating}</p>
@@ -350,11 +348,23 @@ function VendorList() {
                                 value={newVendor.vendor_name}
                                 onChange={(e) => setNewVendor({ ...newVendor, vendor_name: e.target.value })}
                             />
+                            <select
+                                className="w-full border p-2 rounded"
+                                value={newVendor.category}
+                                onChange={(e) => setNewVendor({ ...newVendor, category: e.target.value })}
+                            >
+                                <option value="">Select Category</option>
+                                <option value="Mechanical">Mechanical</option>
+                                <option value="Electronics">Electronics</option>
+                                <option value="IT_Tools">IT_Tools</option>
+                                <option value="Hardware">Hardware</option>
+                                <option value="Certification">Certification</option>
+                            </select>
                             <input
                                 className="w-full border p-2 rounded"
                                 placeholder="Category"
-                                value={newVendor.category}
-                                onChange={(e) => setNewVendor({ ...newVendor, category: e.target.value })}
+                                value={newVendor.subcategory}
+                                onChange={(e) => setNewVendor({ ...newVendor, subcategory: e.target.value })}
                             />
                             <input
                                 className="w-full border p-2 rounded"
@@ -386,7 +396,7 @@ function VendorList() {
             )}
 
             {/* Side Panel */}
-            <div className={`fixed right-0 top-0 h-full w-96 bg-white shadow-lg z-50 border-l transform transition-transform duration-300 ${selectedVendor ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div ref={sidebarRef} className={`fixed right-0 top-0 h-full w-96 bg-white shadow-lg z-50 border-l transform transition-transform duration-300 ${selectedVendor ? 'translate-x-0' : 'translate-x-full'}`}>
                 <div className="p-4 flex justify-between items-center border-b">
                     <h2 className="text-lg font-semibold">Vendor Details</h2>
 
@@ -405,7 +415,7 @@ function VendorList() {
                                 <button onClick={() => setSelectedVendor({ ...selectedVendor, editing: true })} title="Edit">
                                     <i className="bx bx-edit text-blue-600 text-xl hover:scale-110 transition" />
                                 </button>
-                                <button onClick={() => handleDeleteVendor(selectedVendor.vendor_id)} title="Delete">
+                                <button onClick={() => handleDeleteVendor(selectedVendor)} title="Delete">
                                     <i className="bx bx-trash text-gray-600 text-xl hover:scale-110 transition" />
                                 </button>
                             </>
@@ -422,9 +432,22 @@ function VendorList() {
                         <div className="p-4 overflow-y-auto h-[calc(100vh-60px)] space-y-3">
                             {selectedVendor.editing ? (
                                 <>
+                                    {/* Editable vendor fields */}
                                     <input className="w-full border p-2 rounded" value={selectedVendor.vendor_id || ""} onChange={(e) => setSelectedVendor({ ...selectedVendor, vendor_id: e.target.value })} />
                                     <input className="w-full border p-2 rounded" value={selectedVendor.vendor_name || ""} onChange={(e) => setSelectedVendor({ ...selectedVendor, vendor_name: e.target.value })} />
-                                    <input className="w-full border p-2 rounded" value={selectedVendor.category || ""} onChange={(e) => setSelectedVendor({ ...selectedVendor, category: e.target.value })} />
+                                    <select
+                                        className="w-full border p-2 rounded"
+                                        value={selectedVendor.category || ""}
+                                        onChange={(e) => setSelectedVendor({ ...selectedVendor, category: e.target.value })}
+                                    >
+                                        <option value="">Select Category</option>
+                                        <option value="Mechanical">Mechanical</option>
+                                        <option value="Electronics">Electronics</option>
+                                        <option value="IT_Tools">IT_Tools</option>
+                                        <option value="Hardware">Hardware</option>
+                                        <option value="Certification">Certification</option>
+                                    </select>
+                                    <input className="w-full border p-2 rounded" value={selectedVendor.subcategory || ""} onChange={(e) => setSelectedVendor({ ...selectedVendor, subcategory: e.target.value })} />
                                     <input className="w-full border p-2 rounded" value={selectedVendor.address || ""} onChange={(e) => setSelectedVendor({ ...selectedVendor, address: e.target.value })} />
                                     <input className="w-full border p-2 rounded" value={selectedVendor.contact_number || ""} onChange={(e) => setSelectedVendor({ ...selectedVendor, contact_number: e.target.value })} />
                                     <input
@@ -434,9 +457,102 @@ function VendorList() {
                                         value={selectedVendor.rating || ""}
                                         onChange={(e) => setSelectedVendor({ ...selectedVendor, rating: parseFloat(e.target.value) })}
                                     />
+
+                                    {/* Editable Lead Time Tracking */}
+                                    <h3 className="font-semibold mt-4 mb-2 text-sm">Lead Time Tracking</h3>
+                                    <div className="space-y-2">
+                                        {selectedVendor.lead_time_tracking.map((order, idx) => (
+                                            <div key={idx} className="flex gap-2 items-center">
+                                                <input
+                                                    className="border p-1 rounded text-xs flex-1"
+                                                    placeholder="Order ID"
+                                                    value={order.order_id || ""}
+                                                    onChange={(e) => {
+                                                        const updated = [...selectedVendor.lead_time_tracking];
+                                                        updated[idx].order_id = e.target.value;
+                                                        setSelectedVendor({ ...selectedVendor, lead_time_tracking: updated });
+                                                    }}
+                                                />
+                                                <input
+                                                    type="date"
+                                                    className="border p-1 rounded text-xs"
+                                                    value={order.order_date || ""}
+                                                    onChange={(e) => {
+                                                        const updated = [...selectedVendor.lead_time_tracking];
+                                                        updated[idx].order_date = e.target.value;
+                                                        setSelectedVendor({ ...selectedVendor, lead_time_tracking: updated });
+                                                    }}
+                                                />
+                                                <input
+                                                    type="date"
+                                                    className="border p-1 rounded text-xs"
+                                                    value={order.expected_delivery || ""}
+                                                    onChange={(e) => {
+                                                        const updated = [...selectedVendor.lead_time_tracking];
+                                                        updated[idx].expected_delivery = e.target.value;
+                                                        setSelectedVendor({ ...selectedVendor, lead_time_tracking: updated });
+                                                    }}
+                                                />
+                                                <input
+                                                    type="date"
+                                                    className="border p-1 rounded text-xs"
+                                                    value={order.actual_delivery || ""}
+                                                    onChange={(e) => {
+                                                        const updated = [...selectedVendor.lead_time_tracking];
+                                                        updated[idx].actual_delivery = e.target.value;
+                                                        setSelectedVendor({ ...selectedVendor, lead_time_tracking: updated });
+                                                    }}
+                                                />
+                                                <select
+                                                    className="border p-1 rounded text-xs"
+                                                    value={order.status || ""}
+                                                    onChange={(e) => {
+                                                        const updated = [...selectedVendor.lead_time_tracking];
+                                                        updated[idx].status = e.target.value;
+                                                        setSelectedVendor({ ...selectedVendor, lead_time_tracking: updated });
+                                                    }}
+                                                >
+                                                    <option value="">Select Status</option>
+                                                    <option value="On Time">On Time</option>
+                                                    <option value="Late">Late</option>
+                                                </select>
+                                                <button
+                                                    className="bg-red-500 text-white px-2 py-1 rounded text-xs"
+                                                    onClick={() => {
+                                                        const updated = selectedVendor.lead_time_tracking.filter((_, i) => i !== idx);
+                                                        setSelectedVendor({ ...selectedVendor, lead_time_tracking: updated });
+                                                    }}
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <button
+                                        className="mt-2 bg-green-500 text-white px-3 py-1 rounded text-xs"
+                                        onClick={() => {
+                                            setSelectedVendor({
+                                                ...selectedVendor,
+                                                lead_time_tracking: [
+                                                    ...selectedVendor.lead_time_tracking,
+                                                    {
+                                                        order_id: "",
+                                                        order_date: "",
+                                                        expected_delivery: "",
+                                                        actual_delivery: "",
+                                                        status: ""
+                                                    }
+                                                ]
+                                            });
+                                        }}
+                                    >
+                                        + Add Lead Time Entry
+                                    </button>
                                 </>
                             ) : (
                                 <>
+                                    {/* View Mode */}
                                     <div className="mt-4 text-center flex flex-col items-center w-full">
                                         <QRCodeCanvas value={JSON.stringify(selectedVendor)} size={150} />
                                         <h3 className="font-semibold mb-2">{selectedVendor.vendor_name}</h3>
@@ -454,6 +570,10 @@ function VendorList() {
                                             <tr>
                                                 <td className="p-2 font-semibold text-xs border border-gray-300">Category</td>
                                                 <td className="p-2 border text-xs border-gray-300">{selectedVendor.category}</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="p-2 font-semibold text-xs border border-gray-300">Sub Category</td>
+                                                <td className="p-2 border text-xs border-gray-300">{selectedVendor.subcategory}</td>
                                             </tr>
                                             <tr>
                                                 <td className="p-2 font-semibold text-xs border border-gray-300">Address</td>
@@ -484,18 +604,28 @@ function VendorList() {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {selectedVendor.lead_time_tracking.map((order, idx) => (
-                                                        <tr key={idx} className="border-b hover:bg-gray-50">
-                                                            <td className="p-2 text-xs">{order.order_id}</td>
-                                                            <td className="p-2 text-xs">{order.order_date}</td>
-                                                            <td className="p-2 text-xs">{order.expected_delivery}</td>
-                                                            <td className="p-2 text-xs">{order.actual_delivery}</td>
-                                                            <td className={`p-2 text-xs ${order.status === 'On Time' ? 'text-green-600' : 'text-red-600'
-                                                                }`}>
-                                                                {order.status}
+                                                    {selectedVendor.lead_time_tracking && selectedVendor.lead_time_tracking.length > 0 ? (
+                                                        selectedVendor.lead_time_tracking.map((order, idx) => (
+                                                            <tr key={idx} className="border-b hover:bg-gray-50">
+                                                                <td className="p-2 text-xs">{order.order_id}</td>
+                                                                <td className="p-2 text-xs">{order.order_date}</td>
+                                                                <td className="p-2 text-xs">{order.expected_delivery}</td>
+                                                                <td className="p-2 text-xs">{order.actual_delivery}</td>
+                                                                <td
+                                                                    className={`p-2 text-xs ${order.status === 'On Time' ? 'text-green-600' : 'text-red-600'
+                                                                        }`}
+                                                                >
+                                                                    {order.status}
+                                                                </td>
+                                                            </tr>
+                                                        ))
+                                                    ) : (
+                                                        <tr>
+                                                            <td colSpan="5" className="p-2 text-center text-xs text-gray-500">
+                                                                No lead time tracking data
                                                             </td>
                                                         </tr>
-                                                    ))}
+                                                    )}
                                                 </tbody>
                                             </table>
                                         </div>

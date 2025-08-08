@@ -38,7 +38,7 @@ function Sidebar({ collapsed }) {
       {!collapsed ? (
         <div className="w-[50px] h-[50px] flex flex-row items-center">
           <img src={mainlogo} alt="Vaanfly" className="w-full h-full" />
-          <h1 className="font-medium text-lg text-gray-600">Inventory</h1>
+          <h1 className="font-medium text-lg text-gray-600 pointer-events-none">Inventory</h1>
         </div>
       ) : (
         <div className="w-[50px] h-[50px]">
@@ -59,7 +59,7 @@ function Sidebar({ collapsed }) {
                   ${isActive ? 'text-maincolor' : 'text-gray-800 hover:text-maincolor'}`}
                 >
                   <i className={`${item.icon} text-xl me-2`}></i>
-                  {!collapsed && <span>{item.name}</span>}
+                  {!collapsed && <span className="text-sm">{item.name}</span>}
                 </Link>
               ) : (
                 <div>
@@ -115,12 +115,12 @@ function Sidebar({ collapsed }) {
               localStorage.removeItem("authUser");
               navigate("/login");
             }}
-            className="flex items-center px-4 py-2 mx-2 mb-3 text-gray transition hover:text-maincolor"
+            className="flex items-center px-4 py-2 mx-2 mb-3 text-gray text-sm transition hover:text-maincolor"
           >
             <i className="bx bx-log-out text-xl me-2"></i>
             Logout
           </button>
-          <div className="text-xs text-gray-500 text-center px-2 py-3">
+          <div className="text-xs text-gray-500 text-center px-2 py-3 pointer-events-none">
             <hr className="my-2" />
             VAANFLY © 2025 Inventory
           </div>
