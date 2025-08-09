@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import axios from 'axios';
+import { generateEncryptedQRData } from '../components/CryptoJS';
 
 function AllItems() {
     const [items, setItems] = useState([]);
     const [view, setView] = useState('list');
     const sidebarRef = useRef(null);
     const [searchTerm, setSearchTerm] = useState("");
+    const [specs, setSpecs] = useState(null);
+
     const [showModal, setShowModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [showQR, setShowQR] = useState(false);
@@ -148,6 +151,55 @@ function AllItems() {
         };
     }, []);
 
+    const handleGetSpecifications = async (productUrl) => {
+        if (!productUrl) {
+            alert("No product URL available.");
+            return;
+        }
+
+        try {
+            const res = await fetch("http://localhost:5000/extract", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url: productUrl })
+            });
+
+            if (!res.ok) throw new Error("Failed to fetch specs");
+
+            const data = await res.json();
+            console.log("Extracted raw data:", data);
+
+            // Initialize specsData with empty object
+            let specsData = {};
+
+            // Check if we have raw_extraction or specs
+            if (data.raw_extraction) {
+                // Clean the raw extraction string
+                const cleaned = data.raw_extraction
+                    .replace(/```json\s*/i, "")
+                    .replace(/```/g, "")
+                    .trim();
+
+                try {
+                    specsData = JSON.parse(cleaned);
+                } catch (err) {
+                    console.error("Error parsing cleaned JSON:", err);
+                }
+            } else if (data.specs) {
+                // If specs is already an object, use it directly
+                if (typeof data.specs === 'object' && data.specs !== null) {
+                    specsData = data.specs;
+                }
+            }
+
+            setSpecs(specsData);
+
+        } catch (err) {
+            console.error(err);
+            alert("Error getting specifications");
+        }
+    };
+
     return (
         <div className="p-6 bg-white">
             {/* Header */}
@@ -208,8 +260,8 @@ function AllItems() {
                                     currentItems.map((item, idx) => {
                                         if (!item || typeof item !== 'object') return null;
                                         return (
-                                            <>
-                                                <tr key={item._id || idx} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedItem({ ...item, editing: false })}>
+                                            <React.Fragment key={item._id || item.id || idx}>
+                                                <tr className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedItem({ ...item, editing: false })}>
                                                     <td className="p-3">{idx + 1 + ((currentPage - 1) * itemsPerPage)}</td>
                                                     <td className="p-3">{item.id}</td>
                                                     <td className="p-3 text-blue-600 hover:underline cursor-pointer" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>{item.name}</td>
@@ -227,11 +279,11 @@ function AllItems() {
                                                         style={{ top: position.y, left: position.x }}
                                                     >
                                                         <div className="text-center mb-2 font-semibold">{item.name}</div>
-                                                        <QRCodeCanvas value={JSON.stringify(item)} size={128} />
+                                                        <QRCodeCanvas value={generateEncryptedQRData(item)} size={128} />
                                                     </div>
                                                 )
                                                 }
-                                            </>
+                                            </React.Fragment>
                                         );
                                     })
                                 )}
@@ -301,7 +353,7 @@ function AllItems() {
             )}
 
             {/* Side Panel */}
-            <div ref={sidebarRef} className={`fixed right-0 top-0 h-full w-96 bg-white shadow-lg z-50 border-l transform transition-transform duration-300 ${selectedItem ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div ref={sidebarRef} className={`fixed right-0 top-0 h-full overflow-y-auto w-96 bg-white shadow-lg z-50 border-l transform transition-transform duration-300 ${selectedItem ? 'translate-x-0' : 'translate-x-full'}`}>
                 <div className="p-4 flex justify-between items-center border-b">
                     <h2 className="text-lg font-semibold">Product Details</h2>
 
@@ -353,7 +405,7 @@ function AllItems() {
                             ) : (
                                 <>
                                     <div className="mt-4 text-center flex flex-col items-center w-full">
-                                        <QRCodeCanvas value={JSON.stringify(selectedItem)} size={150} />
+                                        <QRCodeCanvas value={generateEncryptedQRData(selectedItem)} size={150} />
                                         <h3 className="font-semibold mb-2">{selectedItem.name}</h3>
                                     </div>
                                     <table className="w-full border border-gray-300">
@@ -388,9 +440,76 @@ function AllItems() {
                                             </tr>
                                         </tbody>
                                     </table>
-                                    {/* <div className='text-xs'>
-                                        Product URL: <a href={selectedItem.url}>{selectedItem.url}</a>
-                                    </div> */}
+                                    <div className="mt-4 text-center">
+                                        <button
+                                            onClick={() => handleGetSpecifications(selectedItem.url)}
+                                            className="text-blue-600 hover:underline"
+                                        >
+                                            Get Specifications
+                                        </button>
+                                    </div>
+                                    {specs && (
+                                        <div className="mt-4">
+                                            {/* Display formatted JSON if raw_extraction exists
+                                            {specs.raw_extraction && (
+                                                <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                                                    <pre className="text-sm text-gray-800 overflow-x-auto">
+                                                        {JSON.stringify(JSON.parse(specs.raw_extraction.replace(/```(json)?/g, '').trim()), null, 2)}
+                                                    </pre>
+                                                </div>
+                                            )} */}
+
+                                            {/* Always display the structured view */}
+                                            <div className="border rounded-lg shadow-sm bg-white overflow-hidden text-xs">
+                                                <table className="w-full">
+                                                    <tbody className="divide-y divide-gray-200">
+                                                        {Object.entries(specs.raw_extraction ? JSON.parse(specs.raw_extraction.replace(/```(json)?/g, '').trim()) : specs).map(([key, value]) => (
+                                                            <tr key={key} className="hover:bg-gray-50">
+                                                                <td className="px-4 py-3 font-medium text-gray-900 align-top w-1/3">
+                                                                    {key}
+                                                                </td>
+                                                                <td className="px-4 py-3 text-gray-700">
+                                                                    {Array.isArray(value) ? (
+                                                                        <ul className="space-y-1">
+                                                                            {value.map((item, idx) => {
+                                                                                // Special handling for Key Specifications array items
+                                                                                if (key === "Key Specifications" && item.includes(":")) {
+                                                                                    const [specKey, ...specValue] = item.split(":");
+                                                                                    return (
+                                                                                        <li key={idx} className="flex">
+                                                                                            <span className="font-medium mr-2">{specKey.trim()}:</span>
+                                                                                            <span>{specValue.join(":").trim()}</span>
+                                                                                        </li>
+                                                                                    );
+                                                                                }
+                                                                                return (
+                                                                                    <li key={idx} className="flex items-start">
+                                                                                        <span className="mr-2">•</span>
+                                                                                        <span>{item}</span>
+                                                                                    </li>
+                                                                                );
+                                                                            })}
+                                                                        </ul>
+                                                                    ) : typeof value === "object" && value !== null ? (
+                                                                        <div className="bg-gray-50 rounded-md p-2">
+                                                                            {Object.entries(value).map(([subKey, subVal]) => (
+                                                                                <div key={subKey} className="flex mb-1 last:mb-0">
+                                                                                    <span className="font-medium mr-2">{subKey}:</span>
+                                                                                    <span>{String(subVal)}</span>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span>{String(value)}</span>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </div>

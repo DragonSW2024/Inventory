@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import axios from 'axios';
+import { generateEncryptedQRData } from '../components/CryptoJS';
 
 function VendorList() {
     const [items, setItems] = useState([]);
@@ -265,7 +266,7 @@ function VendorList() {
                                                         ? showQRtitle.slice(0, 10) + '...'
                                                         : showQRtitle}
                                                 </div>
-                                                <QRCodeCanvas value={JSON.stringify(item)} size={128} />
+                                                <QRCodeCanvas value={generateEncryptedQRData(item)} size={128} />
                                             </div>
                                         )}
                                     </tr>
@@ -554,7 +555,7 @@ function VendorList() {
                                 <>
                                     {/* View Mode */}
                                     <div className="mt-4 text-center flex flex-col items-center w-full">
-                                        <QRCodeCanvas value={JSON.stringify(selectedVendor)} size={150} />
+                                        <QRCodeCanvas value={generateEncryptedQRData(selectedVendor)} size={150} />
                                         <h3 className="font-semibold mb-2">{selectedVendor.vendor_name}</h3>
                                     </div>
                                     <table className="w-full border border-gray-300">
