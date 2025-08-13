@@ -24,7 +24,7 @@ function Sidebar({ collapsed }) {
         { name: "Stock Report", url: `${basePath}/inventory/stock` },
       ]
     },
-    { name: "Sales", icon: "bx bx-cart", url: `${basePath}/sales`, roles: ["admin"] },
+    // { name: "Sales", icon: "bx bx-cart", url: `${basePath}/sales`, roles: ["admin"] },
     { name: "Purchases", icon: "bx bx-shopping-bag", url: `${basePath}/purchases`, roles: ["admin"] },
     { name: "Vendor", icon: "bx bx-store", url: `${basePath}vendor`, roles: ["admin"] },
   ];

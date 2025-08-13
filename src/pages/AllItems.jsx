@@ -9,7 +9,7 @@ function AllItems() {
     const sidebarRef = useRef(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [specs, setSpecs] = useState(null);
-
+    const [showQRtitle, setShowQRtitle] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [showQR, setShowQR] = useState(false);
@@ -129,10 +129,11 @@ function AllItems() {
         }
     };
 
-    const handleMouseEnter = (e) => {
+    const handleMouseEnter = (e, product) => {
         const rect = e.target.getBoundingClientRect();
         setPosition({ x: rect.right, y: rect.top });
         setShowQR(true);
+        setShowQRtitle(product.name);
     };
 
     const handleMouseLeave = () => {
@@ -264,7 +265,7 @@ function AllItems() {
                                                 <tr className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedItem({ ...item, editing: false })}>
                                                     <td className="p-3">{idx + 1 + ((currentPage - 1) * itemsPerPage)}</td>
                                                     <td className="p-3">{item.id}</td>
-                                                    <td className="p-3 text-blue-600 hover:underline cursor-pointer" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>{item.name}</td>
+                                                    <td className="p-3 text-blue-600 hover:underline cursor-pointer" onMouseEnter={(e) => handleMouseEnter(e, item)} onMouseLeave={handleMouseLeave}>{item.name}</td>
                                                     <td className="p-3">{item.model}</td>
                                                     <td className="p-3">{item.count}</td>
                                                     <td className="p-3">{item.category}</td>
@@ -278,7 +279,11 @@ function AllItems() {
                                                         className="absolute bg-white border rounded shadow-lg p-4 z-50"
                                                         style={{ top: position.y, left: position.x }}
                                                     >
-                                                        <div className="text-center mb-2 font-semibold">{item.name}</div>
+                                                        <div className="text-center mb-2 font-semibold">
+                                                            {showQRtitle.length > 10
+                                                                ? showQRtitle.slice(0, 10) + '...'
+                                                                : showQRtitle}
+                                                        </div>
                                                         <QRCodeCanvas value={generateEncryptedQRData(item)} size={128} />
                                                     </div>
                                                 )

@@ -6,6 +6,7 @@ import VendorList from './pages/VendorList';
 import Signup from './screens/Signup';
 import Login from './screens/Login';
 import PrivateRoute from './components/PrivateRoute';
+import Dashboard from './pages/Dashboard';
 
 function App() {
 
@@ -17,6 +18,7 @@ function App() {
             <UserScreen />
           </PrivateRoute>
         }>
+          <Route index element={<Dashboard />} />
           <Route path="inventory/products" element={<AllItems />} />
           <Route path="vendor" element={<VendorList />} />
         </Route>
