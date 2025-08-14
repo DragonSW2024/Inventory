@@ -3,12 +3,14 @@ name: Deploy Vite React App
 on:
   push:
     branches:
-      - main  # Deploy only on main branch updates
+      - main
+
+permissions:
+  contents: write
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -27,6 +29,6 @@ jobs:
       - name: Deploy to master branch
         uses: peaceiris/actions-gh-pages@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          personal_token: ${{ secrets.DEPLOY_TOKEN }}
           publish_dir: ./dist
           publish_branch: master
