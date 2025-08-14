@@ -1,16 +1,16 @@
-name: Deploy React App
+name: Deploy Vite React App
 
 on:
   push:
     branches:
-      - main  # Trigger deploy when pushing to main
+      - main  # Deploy only on main branch updates
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Setup Node.js
@@ -21,12 +21,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build React app
+      - name: Build Vite project
         run: npm run build
 
       - name: Deploy to master branch
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build
+          publish_dir: ./dist
           publish_branch: master
